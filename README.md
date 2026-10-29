@@ -1,11 +1,16 @@
 # One UI 7 Battery Pill  (Vector / LSPosed module for SM-A136B, One UI 6.1 Core)
 
-Hooks `com.android.systemui.battery.BatteryMeterView` (class + field names confirmed from
+Hooks `com.android.systemui.battery.BatteryMeterView` (class + field names confirmed from your
 firmware A136BXXSDDYK2) and replaces the icon with a One UI 7 style pill:
 percentage INSIDE the pill, fill by level, green + bolt while charging, yellow in power saving,
 red at <=15%. If anything fails, SystemUI keeps the stock icon (all hooks are try/catch-wrapped).
 
-
+## Build (no Android Studio needed)
+1. Create a free GitHub account + a new empty repository.
+2. Upload ALL files of this folder to it (keep the folder structure, incl. `.github/workflows/build.yml`).
+3. Open the repo -> "Actions" tab -> "Build APK" -> wait ~3-5 min.
+4. Open the finished run -> Artifacts -> download "OneUI7Pill-apk" -> unzip -> `app-debug.apk`.
+(If the build fails, send me the red error text from the log.)
 
 ## Install
 1. Install `app-debug.apk`.
@@ -15,13 +20,6 @@ red at <=15%. If anything fails, SystemUI keeps the stock icon (all hooks are tr
 
 ## If something looks wrong / to undo
 Vector manager -> disable the module -> restart SystemUI. Nothing on /system is modified.
-
-# Fact
-May work in some devices and may not work in others!
-ONLY FOR ONE UI 6.1 USERS!!!!
-
-USE IT IN UR OWN RISK!
-IT SHOULD WORK FINE
 
 ## Tweaks
 `PillDrawable.java` top: WIDTH_DP / HEIGHT_DP / colours / LOW_LEVEL.
@@ -41,3 +39,14 @@ Options: enable/disable pill (off = stock icon), animations, bolt, number inside
 low-battery threshold, charging color. Changes apply live; if one does not, restart SystemUI.
 Root alternative: `settings put system oneui7pill_enabled 0` (keys are in PillConfig.java).
 AOD: not possible on the Galaxy A13 5G (LCD panel, no AOD in Samsung's firmware).
+
+## v0.4 - notification + Quick Settings tweaks (experimental)
+New section in the app: "Notifications & Quick Settings". Master switch is OFF by default.
+It rescales SystemUI sizes by resource name (names taken from the A136B / One UI 6.1 probe-4 report):
+notification card corners, notification group spacing, notification side margin,
+Quick Settings corners, brightness slider corners, Quick Settings side padding. 100% = stock.
+- Only dimens that SystemUI reads from code are caught; values read while inflating XML are not.
+- SystemUI caches most values: restart SystemUI (or reboot) after a change.
+- To go back to stock: switch it off (or Reset to defaults) and restart SystemUI.
+- Not included: shade transparency/blur (the probe did not show whether those values are int, float
+  or color, so scaling them blindly could break the shade), One UI 7 layouts, Now Bar.

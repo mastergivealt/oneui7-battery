@@ -62,6 +62,12 @@ public class PillHook implements IXposedHookLoadPackage {
     public void handleLoadPackage(XC_LoadPackage.LoadPackageParam lpparam) throws Throwable {
         if (!"com.android.systemui".equals(lpparam.packageName)) return;
 
+        try {
+            UiHook.install(); // v0.4 notification / QS tweaks (inert until switched on in the app)
+        } catch (Throwable t) {
+            XposedBridge.log(TAG + "UiHook install failed: " + t);
+        }
+
         Class<?> cls = XposedHelpers.findClassIfExists(VIEW_CLASS, lpparam.classLoader);
         if (cls == null) {
             XposedBridge.log(TAG + "BatteryMeterView not found - nothing hooked (stock icon stays).");
@@ -102,6 +108,19 @@ public class PillHook implements IXposedHookLoadPackage {
 
     // ------------------------------------------------------------------------------------
     // live settings
+
+    static boolean configReady() {
+        return configReady;
+    }
+
+    /** Lets Resources hooks start the live-settings observer before any battery view exists. */
+    static void initFromApp() {
+        try {
+            Object app = Class.forName("android.app.ActivityThread")
+                    .getMethod("currentApplication").invoke(null);
+            if (app instanceof Context) ensureConfig((Context) app);
+        } catch (Throwable ignored) { }
+    }
 
     private static synchronized void ensureConfig(Context ctx) {
         if (configReady) return;

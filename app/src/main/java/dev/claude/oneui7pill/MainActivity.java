@@ -103,10 +103,35 @@ public class MainActivity extends Activity {
         addSeek(col, "Charging color", PillConfig.K_COLOR, 0, PillConfig.COLORS.length - 1, 0, "",
                 PillConfig.COLOR_NAMES);
 
+        TextView uiTitle = new TextView(this);
+        uiTitle.setText("Notifications & Quick Settings");
+        uiTitle.setTextSize(20f);
+        uiTitle.setPadding(0, dp(28), 0, dp(4));
+        col.addView(uiTitle, matchWrap());
+
+        TextView uiNote = new TextView(this);
+        uiNote.setText("Rescales SystemUI sizes (100% = stock). Off by default. These values are cached by "
+                + "SystemUI, so restart SystemUI (or reboot) after changing them. "
+                + "Turn the switch off and restart to get the stock look back.");
+        uiNote.setPadding(0, 0, 0, dp(8));
+        col.addView(uiNote, matchWrap());
+
+        addSwitch(col, "Enable notification & QS tweaks", PillConfig.K_UI_ON, 0);
+        String[] uiLabels = {
+                "Notification card corners", "Notification group spacing", "Notification side margin",
+                "Quick Settings corners", "Brightness slider corners", "Quick Settings side padding"
+        };
+        for (int i = 0; i < uiLabels.length; i++) {
+            addSeek(col, uiLabels[i], PillConfig.UI_KEYS[i], PillConfig.UI_MIN[i], PillConfig.UI_MAX[i],
+                    100, "%", null);
+        }
+
         Button reset = new Button(this);
         reset.setText("Reset to defaults");
         reset.setOnClickListener(new View.OnClickListener() {
             @Override public void onClick(View v) {
+                put(PillConfig.K_UI_ON, 0);
+                for (String k : PillConfig.UI_KEYS) put(k, 100);
                 put(PillConfig.K_ENABLED, 1);
                 put(PillConfig.K_ANIM, 1);
                 put(PillConfig.K_BOLT, 1);
