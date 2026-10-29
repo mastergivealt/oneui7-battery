@@ -1,16 +1,28 @@
 package dev.claude.oneui7pill;
 
 import android.content.BroadcastReceiver;
+import android.content.ContentResolver;
 import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
+import android.database.ContentObserver;
+import android.net.Uri;
 import android.os.BatteryManager;
 import android.os.Build;
+import android.os.Handler;
+import android.os.Looper;
 import android.os.PowerManager;
+import android.provider.Settings;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.ImageView;
 import android.widget.TextView;
+
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
+import java.util.Map;
+import java.util.WeakHashMap;
 
 import de.robv.android.xposed.IXposedHookLoadPackage;
 import de.robv.android.xposed.XC_MethodHook;
@@ -19,9 +31,9 @@ import de.robv.android.xposed.XposedHelpers;
 import de.robv.android.xposed.callbacks.XC_LoadPackage;
 
 /**
- * Hooks com.android.systemui.battery.BatteryMeterView (names confirmed from the SM-A136B
- * firmware A136BXXSDDYK2 dex dump) and swaps its icon drawable for a One UI 7 style pill.
- * Everything is wrapped in try/catch: on any problem SystemUI just keeps the stock icon.
+ * Hooks com.android.systemui.battery.BatteryMeterView and swaps its icon for a One UI 7 style pill.
+ * Settings are read live from Settings.System (keys "oneui7pill_*") written by the module app.
+ * With "enabled" = off the stock icon is restored. All hooks are try/catch-wrapped.
  */
 public class PillHook implements IXposedHookLoadPackage {
 
@@ -29,7 +41,6 @@ public class PillHook implements IXposedHookLoadPackage {
     private static final String VIEW_CLASS = "com.android.systemui.battery.BatteryMeterView";
     private static final String HOLDER_KEY = "oneui7pill_holder";
 
-    // Methods after which the stock code may have re-set its own drawable / sizes / visibility.
     private static final String[] APPLY_AFTER = {
             "updateDrawable", "updatePercentText", "updateShowPercent", "setPercentShowMode",
             "scaleBatteryMeterViews", "onAttachedToWindow", "onDarkChanged", "updateColors",
@@ -37,6 +48,15 @@ public class PillHook implements IXposedHookLoadPackage {
             "onDensityOrFontScaleChanged", "onConfigurationChanged", "setForceShowPercent"
     };
     private static final String[] RELEASE_AFTER = { "onDetachedFromWindow" };
+    // stock methods we call to make SystemUI redraw its own state when a setting changes
+    private static final String[] STOCK_REFRESH = {
+            "updateDrawable", "scaleBatteryMeterViews", "updateShowPercent", "updatePercentText"
+    };
+
+    private static final Map<View, Boolean> VIEWS =
+            Collections.synchronizedMap(new WeakHashMap<View, Boolean>());
+    private static boolean configReady = false;
+    private static ContentObserver observer; // strong ref on purpose
 
     @Override
     public void handleLoadPackage(XC_LoadPackage.LoadPackageParam lpparam) throws Throwable {
@@ -81,21 +101,82 @@ public class PillHook implements IXposedHookLoadPackage {
     }
 
     // ------------------------------------------------------------------------------------
+    // live settings
+
+    private static synchronized void ensureConfig(Context ctx) {
+        if (configReady) return;
+        configReady = true;
+        try {
+            final ContentResolver cr = ctx.getContentResolver();
+            PillConfig.load(cr);
+            observer = new ContentObserver(new Handler(Looper.getMainLooper())) {
+                @Override
+                public void onChange(boolean selfChange, Uri uri) {
+                    try {
+                        String seg = uri != null ? uri.getLastPathSegment() : null;
+                        if (seg != null && !seg.startsWith(PillConfig.P)) return;
+                        PillConfig.load(cr);
+                        refreshAll();
+                    } catch (Throwable t) {
+                        XposedBridge.log(TAG + "settings change failed: " + t);
+                    }
+                }
+            };
+            cr.registerContentObserver(Settings.System.CONTENT_URI, true, observer);
+        } catch (Throwable t) {
+            XposedBridge.log(TAG + "config init failed (defaults used): " + t);
+        }
+    }
+
+    private static void refreshAll() {
+        List<View> list;
+        synchronized (VIEWS) { list = new ArrayList<View>(VIEWS.keySet()); }
+        for (View v : list) {
+            try {
+                for (String m : STOCK_REFRESH) safeCall(v, m);
+                apply(v);
+            } catch (Throwable t) {
+                XposedBridge.log(TAG + "refresh failed: " + t);
+            }
+        }
+    }
+
+    private static void safeCall(View v, String method) {
+        try { XposedHelpers.callMethod(v, method); } catch (Throwable ignored) { }
+    }
+
+    // ------------------------------------------------------------------------------------
 
     private static void apply(View root) {
+        ensureConfig(root.getContext());
+        VIEWS.put(root, Boolean.TRUE);
+
+        Holder h = (Holder) XposedHelpers.getAdditionalInstanceField(root, HOLDER_KEY);
+
+        if (!PillConfig.enabled) {              // disabled -> leave stock icon alone
+            if (h != null && h.active) {
+                h.active = false;
+                h.unregister();
+            }
+            return;
+        }
+
         ImageView icon = findIcon(root);
         if (icon == null) return;
         TextView percent = findPercent(root);
 
-        Holder h = (Holder) XposedHelpers.getAdditionalInstanceField(root, HOLDER_KEY);
         if (h == null) {
             h = new Holder(root.getContext());
             XposedHelpers.setAdditionalInstanceField(root, HOLDER_KEY, h);
         }
+        h.active = true;
         h.percentView = percent;
         h.registerIfNeeded();
 
         PillDrawable d = h.drawable;
+        d.configure(PillConfig.scalePct / 100f, PillConfig.low, PillConfig.chargeColor(),
+                PillConfig.anim, PillConfig.bolt, PillConfig.inside);
+
         if (icon.getDrawable() != d) icon.setImageDrawable(d);
         icon.setScaleType(ImageView.ScaleType.FIT_XY);
 
@@ -106,8 +187,7 @@ public class PillHook implements IXposedHookLoadPackage {
             icon.setLayoutParams(lp);
         }
 
-        // the number now lives inside the pill -> hide the separate % text
-        if (percent != null && percent.getVisibility() != View.GONE) {
+        if (PillConfig.inside && percent != null && percent.getVisibility() != View.GONE) {
             percent.setVisibility(View.GONE);
         }
         d.invalidateSelf();
@@ -147,6 +227,7 @@ public class PillHook implements IXposedHookLoadPackage {
         final PillDrawable drawable;
         TextView percentView;
         boolean registered;
+        boolean active;
 
         Holder(Context ctx) {
             this.context = ctx;
@@ -155,7 +236,6 @@ public class PillHook implements IXposedHookLoadPackage {
 
         @Override
         public int foreground() {
-            // SystemUI keeps this text colour in sync with light/dark status bar areas.
             TextView tv = percentView;
             return tv != null ? tv.getCurrentTextColor() : 0xFFFFFFFF;
         }

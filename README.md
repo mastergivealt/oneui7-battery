@@ -23,3 +23,19 @@ Vector manager -> disable the module -> restart SystemUI. Nothing on /system is 
 
 ## Tweaks
 `PillDrawable.java` top: WIDTH_DP / HEIGHT_DP / colours / LOW_LEVEL.
+
+## v0.2 - animations
+- Plug in: green fill wipes in from the left, bolt pops in with an overshoot.
+- While charging: a soft light sweep glides over the fill every ~4 s.
+- Level changes glide smoothly; colour changes (charging / power saving / low) cross-fade.
+- Redraws only while an animation is running (no constant redraw).
+Timings are constants at the top of PillDrawable.java (INTRO_MS, SHIMMER_PERIOD_MS, ...).
+Update: upload the changed files to the same repo, build again, install over the old APK, restart SystemUI.
+
+## v0.3 - settings app (live, turn anything off any time)
+Open the "One UI 7 Pill" app (or the module's settings button in Vector). First tap
+"Grant permission" (Modify system settings) - this is how the app talks to SystemUI.
+Options: enable/disable pill (off = stock icon), animations, bolt, number inside, size 70-140%,
+low-battery threshold, charging color. Changes apply live; if one does not, restart SystemUI.
+Root alternative: `settings put system oneui7pill_enabled 0` (keys are in PillConfig.java).
+AOD: not possible on the Galaxy A13 5G (LCD panel, no AOD in Samsung's firmware).

@@ -28,10 +28,8 @@ public class PillDrawable extends Drawable {
     // ---- tweakables ----
     public static final float WIDTH_DP = 26f;
     public static final float HEIGHT_DP = 14f;
-    private static final int COLOR_CHARGING = 0xFF3DDC84;
     private static final int COLOR_POWER_SAVE = 0xFFFFC83D;
     private static final int COLOR_LOW = 0xFFFF4D4D;
-    private static final int LOW_LEVEL = 15;
 
     // animation timing (ms)
     private static final long INTRO_MS = 1300;          // whole plug-in animation
@@ -68,6 +66,14 @@ public class PillDrawable extends Drawable {
     private int alpha = 255;
     private boolean initialized = false;
 
+    // user config (see PillConfig)
+    private float scale = 1f;
+    private int lowLevel = 15;
+    private int chargeColor = 0xFF3DDC84;
+    private boolean animate = true;
+    private boolean showBolt = true;
+    private boolean showNumber = true;
+
     // animation state
     private float levelFrom = 100f, levelTo = 100f;
     private long levelStart = 0;
@@ -86,8 +92,19 @@ public class PillDrawable extends Drawable {
         textPaint.setTextAlign(Paint.Align.LEFT);
     }
 
-    public int widthPx() { return Math.round(WIDTH_DP * density); }
-    public int heightPx() { return Math.round(HEIGHT_DP * density); }
+    public int widthPx() { return Math.round(WIDTH_DP * density * scale); }
+    public int heightPx() { return Math.round(HEIGHT_DP * density * scale); }
+
+    public void configure(float scale, int lowLevel, int chargeColor,
+                          boolean animate, boolean showBolt, boolean showNumber) {
+        this.scale = scale;
+        this.lowLevel = lowLevel;
+        this.chargeColor = chargeColor;
+        this.animate = animate;
+        this.showBolt = showBolt;
+        this.showNumber = showNumber;
+        invalidateSelf();
+    }
 
     public void setState(int newLevel, boolean newCharging, boolean newPowerSave) {
         long now = SystemClock.uptimeMillis();
@@ -167,7 +184,7 @@ public class PillDrawable extends Drawable {
         fg |= 0xFF000000;
 
         // --- colour (cross-fades when the state kind changes) ---
-        int kind = charging ? 1 : powerSave ? 2 : level <= LOW_LEVEL ? 3 : 0;
+        int kind = charging ? 1 : powerSave ? 2 : level <= lowLevel ? 3 : 0;
         if (colorKind == -1) {
             colorKind = kind;
             colorStart = now - COLOR_ANIM_MS;
@@ -176,11 +193,11 @@ public class PillDrawable extends Drawable {
             colorKind = kind;
             colorStart = now;
         }
-        int target = kind == 1 ? COLOR_CHARGING
+        int target = kind == 1 ? chargeColor
                 : kind == 2 ? COLOR_POWER_SAVE
                 : kind == 3 ? COLOR_LOW
                 : fg;
-        float ct = (now - colorStart) / (float) COLOR_ANIM_MS;
+        float ct = animate ? (now - colorStart) / (float) COLOR_ANIM_MS : 1f;
         int fillColor;
         if (ct >= 1f) {
             fillColor = target;
@@ -192,13 +209,13 @@ public class PillDrawable extends Drawable {
         int onFill = isLight(fillColor) ? Color.BLACK : Color.WHITE;
 
         // --- level (glides) ---
-        float disp = displayLevel(now);
-        if (now - levelStart < LEVEL_ANIM_MS) active = true;
+        float disp = animate ? displayLevel(now) : levelTo;
+        if (animate && now - levelStart < LEVEL_ANIM_MS) active = true;
         float frac = disp / 100f;
 
         // --- plug-in intro ---
         float introMs = -1f;
-        if (charging && playIntro) {
+        if (animate && charging && playIntro) {
             long dt = now - chargeAnchor;
             if (dt < INTRO_MS) { introMs = dt; active = true; }
         }
@@ -211,7 +228,7 @@ public class PillDrawable extends Drawable {
         boolean sweeping = false;
         float sweepT = 0f;
         long nextWake = -1;
-        if (charging && introMs < 0f) {
+        if (animate && charging && introMs < 0f) {
             long since = now - (chargeAnchor + INTRO_MS);
             if (since >= 0) {
                 long ph = since % SHIMMER_PERIOD_MS;
@@ -269,15 +286,16 @@ public class PillDrawable extends Drawable {
         // --- number (+ bolt) ---
         textPaint.setTextSize(h * 0.68f);
         String s = String.valueOf(level);
-        float textW = textPaint.measureText(s);
-        float boltW = charging ? h * 0.32f : 0f;
-        float gap = charging ? h * 0.06f : 0f;
+        float textW = showNumber ? textPaint.measureText(s) : 0f;
+        boolean drawBolt = charging && showBolt;
+        float boltW = drawBolt ? h * 0.32f : 0f;
+        float gap = (drawBolt && showNumber) ? h * 0.06f : 0f;
         float total = boltW + gap + textW;
         float startX = b.left + (w - total) / 2f;
         Paint.FontMetrics fm = textPaint.getFontMetrics();
         float baseline = b.top + h / 2f - (fm.ascent + fm.descent) / 2f;
 
-        if (charging) {
+        if (drawBolt) {
             buildBolt(startX, b.top + h * 0.20f, boltW, h * 0.60f);
             boltCx = startX + boltW / 2f;
             boltCy = b.top + h / 2f;
@@ -303,10 +321,12 @@ public class PillDrawable extends Drawable {
     }
 
     private void drawContent(Canvas canvas, String s, float x, float baseline, int color, float boltScale) {
-        textPaint.setColor(color);
-        textPaint.setAlpha(alpha);
-        canvas.drawText(s, x, baseline, textPaint);
-        if (charging && boltScale > 0.01f) {
+        if (showNumber) {
+            textPaint.setColor(color);
+            textPaint.setAlpha(alpha);
+            canvas.drawText(s, x, baseline, textPaint);
+        }
+        if (charging && showBolt && boltScale > 0.01f) {
             boltPaint.setStyle(Paint.Style.FILL);
             boltPaint.setColor(color);
             boltPaint.setAlpha(alpha);
