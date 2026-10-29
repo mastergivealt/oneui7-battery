@@ -1,7 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
-    <uses-permission android:name="android.permission.WRITE_SETTINGS" />
+    <permission android:name="dev.claude.oneui7pill.permission.WRITE_CONFIG"
+        android:protectionLevel="signature" />
 
     <application
         android:allowBackup="false"
@@ -20,6 +21,13 @@
                 <category android:name="de.robv.android.xposed.category.MODULE_SETTINGS" />
             </intent-filter>
         </activity>
+
+        <provider
+            android:name=".ConfigProvider"
+            android:authorities="dev.claude.oneui7pill.cfg"
+            android:exported="true"
+            android:directBootAware="true"
+            android:writePermission="dev.claude.oneui7pill.permission.WRITE_CONFIG" />
 
         <meta-data android:name="xposedmodule" android:value="true" />
         <meta-data android:name="xposeddescription"

@@ -91,6 +91,7 @@ final class UiHook {
 
     private static void handle(XC_MethodHook.MethodHookParam param) {
         if (!PillHook.configReady()) PillHook.initFromApp();
+        PillHook.reloadIfStale();
         if (!PillConfig.uiOn) return;
 
         Object[] a = param.args;

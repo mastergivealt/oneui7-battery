@@ -50,3 +50,9 @@ Quick Settings corners, brightness slider corners, Quick Settings side padding. 
 - To go back to stock: switch it off (or Reset to defaults) and restart SystemUI.
 - Not included: shade transparency/blur (the probe did not show whether those values are int, float
   or color, so scaling them blindly could break the shade), One UI 7 layouts, Now Bar.
+
+## v0.4.2 - settings storage changed
+Settings.System rejected writes with IllegalArgumentException on this firmware. Settings now live
+inside the module app (ConfigProvider, authority dev.claude.oneui7pill.cfg); SystemUI reads them via
+that provider, only the app can write. No "Modify system settings" permission needed any more.
+Install the new APK over the old one and restart SystemUI. Old oneui7pill_* system settings are ignored.

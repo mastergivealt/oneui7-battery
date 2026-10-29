@@ -7,8 +7,8 @@ android {
         applicationId = "dev.claude.oneui7pill"
         minSdk = 26
         targetSdk = 34
-        versionCode = 4
-        versionName = "0.4"
+        versionCode = 6
+        versionName = "0.4.2"
     }
     buildTypes {
         release {

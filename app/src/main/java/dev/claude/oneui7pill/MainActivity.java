@@ -19,6 +19,7 @@ import android.widget.Toast;
 /** Plain settings screen: writes Settings.System keys that SystemUI reads live. */
 public class MainActivity extends Activity {
 
+    private TextView status;
     private TextView permBanner;
     private Button permButton;
 
@@ -38,25 +39,37 @@ public class MainActivity extends Activity {
         return Math.round(v * getResources().getDisplayMetrics().density);
     }
 
+    private java.util.Map<String, Integer> cache;
+
     private int get(String key, int def) {
-        return Settings.System.getInt(getContentResolver(), key, def);
+        if (cache == null) {
+            cache = PillConfig.readAll(getContentResolver());
+            if (cache == null) cache = new java.util.HashMap<String, Integer>();
+        }
+        Integer v = cache.get(key);
+        return v != null ? v : def;
     }
 
     private void put(String key, int value) {
-        if (!Settings.System.canWrite(this)) {
-            Toast.makeText(this, "Grant \"Modify system settings\" first", Toast.LENGTH_LONG).show();
-            refreshPermission();
-            return;
-        }
         try {
-            Settings.System.putInt(getContentResolver(), key, value);
+            PillConfig.write(getContentResolver(), key, value);
+            java.util.Map<String, Integer> now = PillConfig.readAll(getContentResolver());
+            int back = (now != null && now.containsKey(key)) ? now.get(key) : Integer.MIN_VALUE;
+            if (now != null) cache = now;
+            if (status != null) {
+                status.setText(back == value
+                        ? "Saved: " + key + " = " + back
+                        : "NOT saved: wrote " + value + " but it reads back " + back);
+            }
         } catch (Throwable t) {
-            Toast.makeText(this, "Could not save: " + t, Toast.LENGTH_LONG).show();
+            String msg = "Could not save: " + t;
+            if (status != null) status.setText(msg);
+            Toast.makeText(this, msg, Toast.LENGTH_LONG).show();
         }
     }
 
     private void refreshPermission() {
-        boolean ok = Settings.System.canWrite(this);
+        boolean ok = true; // no special permission needed any more
         permBanner.setVisibility(ok ? View.GONE : View.VISIBLE);
         permButton.setVisibility(ok ? View.GONE : View.VISIBLE);
     }
@@ -78,6 +91,12 @@ public class MainActivity extends Activity {
         sub.setText("Changes apply live in SystemUI. If something does not update, restart SystemUI.");
         sub.setPadding(0, dp(4), 0, dp(16));
         col.addView(sub, matchWrap());
+
+        status = new TextView(this);
+        status.setText("Stored inside this app (read by SystemUI through its content provider). "
+                + "Nothing saved yet this session.");
+        status.setPadding(0, 0, 0, dp(12));
+        col.addView(status, matchWrap());
 
         permBanner = new TextView(this);
         permBanner.setText("Needs the \"Modify system settings\" permission to talk to SystemUI.");

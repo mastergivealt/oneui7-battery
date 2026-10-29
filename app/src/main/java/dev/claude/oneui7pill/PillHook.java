@@ -57,6 +57,42 @@ public class PillHook implements IXposedHookLoadPackage {
             Collections.synchronizedMap(new WeakHashMap<View, Boolean>());
     private static boolean configReady = false;
     private static ContentObserver observer; // strong ref on purpose
+    private static volatile ContentResolver resolver;
+    private static volatile long lastLoad;
+
+    private static final java.util.concurrent.atomic.AtomicBoolean LOADING =
+            new java.util.concurrent.atomic.AtomicBoolean();
+    private static Handler mainHandler;
+
+    /** Reads the config off the main thread; optionally refreshes the icons afterwards. */
+    private static void loadAsync(final boolean refresh) {
+        final ContentResolver cr = resolver;
+        if (cr == null || !LOADING.compareAndSet(false, true)) return;
+        lastLoad = android.os.SystemClock.uptimeMillis();
+        new Thread(new Runnable() {
+            @Override public void run() {
+                try {
+                    boolean ok = PillConfig.load(cr);
+                    if (ok && refresh && mainHandler != null) {
+                        mainHandler.post(new Runnable() {
+                            @Override public void run() { refreshAll(); }
+                        });
+                    }
+                } catch (Throwable t) {
+                    XposedBridge.log(TAG + "load failed: " + t);
+                } finally {
+                    LOADING.set(false);
+                }
+            }
+        }, "oneui7pill-load").start();
+    }
+
+    /** Fallback if the ContentObserver never fires: re-read settings at most every 5 s. */
+    static void reloadIfStale() {
+        if (resolver == null) return;
+        if (android.os.SystemClock.uptimeMillis() - lastLoad < 5000) return;
+        loadAsync(true);
+    }
 
     @Override
     public void handleLoadPackage(XC_LoadPackage.LoadPackageParam lpparam) throws Throwable {
@@ -127,21 +163,20 @@ public class PillHook implements IXposedHookLoadPackage {
         configReady = true;
         try {
             final ContentResolver cr = ctx.getContentResolver();
-            PillConfig.load(cr);
-            observer = new ContentObserver(new Handler(Looper.getMainLooper())) {
+            resolver = cr;
+            mainHandler = new Handler(Looper.getMainLooper());
+            observer = new ContentObserver(mainHandler) {
                 @Override
                 public void onChange(boolean selfChange, Uri uri) {
                     try {
-                        String seg = uri != null ? uri.getLastPathSegment() : null;
-                        if (seg != null && !seg.startsWith(PillConfig.P)) return;
-                        PillConfig.load(cr);
-                        refreshAll();
+                        loadAsync(true);
                     } catch (Throwable t) {
                         XposedBridge.log(TAG + "settings change failed: " + t);
                     }
                 }
             };
-            cr.registerContentObserver(Settings.System.CONTENT_URI, true, observer);
+            cr.registerContentObserver(Uri.parse("content://" + PillConfig.AUTH), true, observer);
+            loadAsync(true); // defaults are used until this finishes
         } catch (Throwable t) {
             XposedBridge.log(TAG + "config init failed (defaults used): " + t);
         }
@@ -168,6 +203,7 @@ public class PillHook implements IXposedHookLoadPackage {
 
     private static void apply(View root) {
         ensureConfig(root.getContext());
+        reloadIfStale();
         VIEWS.put(root, Boolean.TRUE);
 
         Holder h = (Holder) XposedHelpers.getAdditionalInstanceField(root, HOLDER_KEY);

@@ -1,13 +1,20 @@
 package dev.claude.oneui7pill;
 
 import android.content.ContentResolver;
-import android.provider.Settings;
+import android.content.ContentValues;
+import android.database.Cursor;
+import android.net.Uri;
 
-/** Settings live in Settings.System (written by the module app, read live by SystemUI). */
+import java.util.HashMap;
+import java.util.Map;
+
+/** Settings live in the module app (ConfigProvider), written by the app, read live by SystemUI. */
 public final class PillConfig {
     private PillConfig() {}
 
     public static final String P = "oneui7pill_";
+    public static final String AUTH = "dev.claude.oneui7pill.cfg";
+    public static final Uri URI = Uri.parse("content://" + AUTH + "/all");
     public static final String K_ENABLED = P + "enabled";
     public static final String K_ANIM = P + "anim";
     public static final String K_BOLT = P + "bolt";
@@ -53,19 +60,50 @@ public final class PillConfig {
         return COLORS[i];
     }
 
-    public static void load(ContentResolver cr) {
-        enabled = Settings.System.getInt(cr, K_ENABLED, 1) != 0;
-        anim = Settings.System.getInt(cr, K_ANIM, 1) != 0;
-        bolt = Settings.System.getInt(cr, K_BOLT, 1) != 0;
-        inside = Settings.System.getInt(cr, K_INSIDE, 1) != 0;
-        scalePct = Math.max(70, Math.min(140, Settings.System.getInt(cr, K_SCALE, 100)));
-        low = Math.max(5, Math.min(30, Settings.System.getInt(cr, K_LOW, 15)));
-        colorIdx = Math.max(0, Math.min(COLORS.length - 1, Settings.System.getInt(cr, K_COLOR, 0)));
-
-        uiOn = Settings.System.getInt(cr, K_UI_ON, 0) != 0;
-        for (int i = 0; i < UI_KEYS.length; i++) {
-            int v = Settings.System.getInt(cr, UI_KEYS[i], 100);
-            UI_PCT[i] = Math.max(UI_MIN[i], Math.min(UI_MAX[i], v));
+    /** All stored values, or null if the provider could not be reached. */
+    public static Map<String, Integer> readAll(ContentResolver cr) {
+        Cursor c = null;
+        try {
+            c = cr.query(URI, null, null, null, null);
+            if (c == null) return null;
+            Map<String, Integer> m = new HashMap<String, Integer>();
+            while (c.moveToNext()) m.put(c.getString(0), c.getInt(1));
+            return m;
+        } catch (Throwable t) {
+            return null;
+        } finally {
+            if (c != null) c.close();
         }
+    }
+
+    public static void write(ContentResolver cr, String key, int value) {
+        ContentValues cv = new ContentValues();
+        cv.put("key", key);
+        cv.put("value", value);
+        if (cr.insert(URI, cv) == null) throw new IllegalStateException("provider rejected " + key);
+    }
+
+    private static int get(Map<String, Integer> m, String k, int d) {
+        Integer v = m.get(k);
+        return v != null ? v : d;
+    }
+
+    /** @return false if the provider was unreachable (previous values are kept). */
+    public static boolean load(ContentResolver cr) {
+        Map<String, Integer> m = readAll(cr);
+        if (m == null) return false;
+        enabled = get(m, K_ENABLED, 1) != 0;
+        anim = get(m, K_ANIM, 1) != 0;
+        bolt = get(m, K_BOLT, 1) != 0;
+        inside = get(m, K_INSIDE, 1) != 0;
+        scalePct = Math.max(70, Math.min(140, get(m, K_SCALE, 100)));
+        low = Math.max(5, Math.min(30, get(m, K_LOW, 15)));
+        colorIdx = Math.max(0, Math.min(COLORS.length - 1, get(m, K_COLOR, 0)));
+
+        uiOn = get(m, K_UI_ON, 0) != 0;
+        for (int i = 0; i < UI_KEYS.length; i++) {
+            UI_PCT[i] = Math.max(UI_MIN[i], Math.min(UI_MAX[i], get(m, UI_KEYS[i], 100)));
+        }
+        return true;
     }
 }
