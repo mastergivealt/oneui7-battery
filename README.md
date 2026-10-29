@@ -1,6 +1,6 @@
 # One UI 7 Battery Pill  (Vector / LSPosed module for SM-A136B, One UI 6.1 Core)
 
-Hooks `com.android.systemui.battery.BatteryMeterView` (class + field names confirmed from your
+Hooks `com.android.systemui.battery.BatteryMeterView` (class + field names confirmed from
 firmware A136BXXSDDYK2) and replaces the icon with a One UI 7 style pill:
 percentage INSIDE the pill, fill by level, green + bolt while charging, yellow in power saving,
 red at <=15%. If anything fails, SystemUI keeps the stock icon (all hooks are try/catch-wrapped).
@@ -15,6 +15,13 @@ red at <=15%. If anything fails, SystemUI keeps the stock icon (all hooks are tr
 
 ## If something looks wrong / to undo
 Vector manager -> disable the module -> restart SystemUI. Nothing on /system is modified.
+
+# Fact
+May work in some devices and may not work in others!
+ONLY FOR ONE UI 6.1 USERS!!!!
+
+USE IT IN UR OWN RISK!
+IT SHOULD WORK FINE
 
 ## Tweaks
 `PillDrawable.java` top: WIDTH_DP / HEIGHT_DP / colours / LOW_LEVEL.
