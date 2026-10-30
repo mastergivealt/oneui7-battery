@@ -22,6 +22,10 @@ public final class PillConfig {
     public static final String K_SCALE = P + "scale";
     public static final String K_LOW = P + "low";
     public static final String K_COLOR = P + "color";
+    // v0.5
+    public static final String K_TEXT_STYLE = P + "text_style";   // 0 = One UI 7 (single inverted color), 1 = split
+    public static final String K_SAVER_STYLE = P + "saver_style"; // 0 = One UI 7 (leaf), 1 = yellow fill
+    public static final String K_CHARGE_STYLE = P + "charge_style"; // 0 = green fill, 1 = neutral fill + bolt
 
     // v0.4: notification / quick settings tweaks (all default to stock)
     public static final String K_UI_ON = P + "ui_on";
@@ -49,6 +53,9 @@ public final class PillConfig {
     public static volatile int scalePct = 100;
     public static volatile int low = 15;
     public static volatile int colorIdx = 0;
+    public static volatile int textStyle = 0;
+    public static volatile int saverStyle = 0;
+    public static volatile int chargeStyle = 0;
 
     public static volatile boolean uiOn = false;
     /** Percent of the stock value per UiHook group (100 = stock). */
@@ -99,6 +106,9 @@ public final class PillConfig {
         scalePct = Math.max(70, Math.min(140, get(m, K_SCALE, 100)));
         low = Math.max(5, Math.min(30, get(m, K_LOW, 15)));
         colorIdx = Math.max(0, Math.min(COLORS.length - 1, get(m, K_COLOR, 0)));
+        textStyle = Math.max(0, Math.min(1, get(m, K_TEXT_STYLE, 0)));
+        saverStyle = Math.max(0, Math.min(1, get(m, K_SAVER_STYLE, 0)));
+        chargeStyle = Math.max(0, Math.min(1, get(m, K_CHARGE_STYLE, 0)));
 
         uiOn = get(m, K_UI_ON, 0) != 0;
         for (int i = 0; i < UI_KEYS.length; i++) {

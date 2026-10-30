@@ -56,3 +56,14 @@ Settings.System rejected writes with IllegalArgumentException on this firmware. 
 inside the module app (ConfigProvider, authority dev.claude.oneui7pill.cfg); SystemUI reads them via
 that provider, only the app can write. No "Modify system settings" permission needed any more.
 Install the new APK over the old one and restart SystemUI. Old oneui7pill_* system settings are ignored.
+
+## v0.5.0 - look matched to One UI 7
+- Number is now ONE color (inverse of the icon color), bold, centered over the whole pill - like One UI 7.
+  (Old split-color number is still available: Look -> Number style.)
+- Power saving shows a leaf in front of the number, normal colors (old yellow fill still available).
+- Charging: green fill, white bolt in front of the number. "Neutral + bolt" gives the light/white-fill variant.
+- Pill gets wider (26dp -> 32dp) while a bolt/leaf is shown, like One UI 7. "100" shrinks to fit.
+- Low battery: red fill, track and number unchanged.
+- Track is lighter on a dark status bar and softer on a light one.
+- Fixed: stale "Grant permission" banner removed from the app, possible view leak in the holder.
+Update: upload the changed files to the same repo, build, install over the old APK, restart SystemUI.

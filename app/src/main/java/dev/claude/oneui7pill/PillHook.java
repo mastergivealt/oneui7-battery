@@ -230,22 +230,28 @@ public class PillHook implements IXposedHookLoadPackage {
 
         PillDrawable d = h.drawable;
         d.configure(PillConfig.scalePct / 100f, PillConfig.low, PillConfig.chargeColor(),
-                PillConfig.anim, PillConfig.bolt, PillConfig.inside);
+                PillConfig.anim, PillConfig.bolt, PillConfig.inside,
+                PillConfig.textStyle, PillConfig.saverStyle, PillConfig.chargeStyle);
 
+        h.iconRef = new java.lang.ref.WeakReference<ImageView>(icon);
         if (icon.getDrawable() != d) icon.setImageDrawable(d);
         icon.setScaleType(ImageView.ScaleType.FIT_XY);
+        fitIcon(icon, d);
 
+        if (PillConfig.inside && percent != null && percent.getVisibility() != View.GONE) {
+            percent.setVisibility(View.GONE);
+        }
+        d.invalidateSelf();
+    }
+
+    /** The pill is wider with a bolt / leaf, so the ImageView size follows the drawable's state. */
+    private static void fitIcon(ImageView icon, PillDrawable d) {
         ViewGroup.LayoutParams lp = icon.getLayoutParams();
         if (lp != null && (lp.width != d.widthPx() || lp.height != d.heightPx())) {
             lp.width = d.widthPx();
             lp.height = d.heightPx();
             icon.setLayoutParams(lp);
         }
-
-        if (PillConfig.inside && percent != null && percent.getVisibility() != View.GONE) {
-            percent.setVisibility(View.GONE);
-        }
-        d.invalidateSelf();
     }
 
     private static ImageView findIcon(View root) {
@@ -281,6 +287,7 @@ public class PillHook implements IXposedHookLoadPackage {
         final Context context;
         final PillDrawable drawable;
         TextView percentView;
+        java.lang.ref.WeakReference<ImageView> iconRef; // weak: the view is the key of the holder map
         boolean registered;
         boolean active;
 
@@ -341,6 +348,8 @@ public class PillHook implements IXposedHookLoadPackage {
                 PowerManager pm = (PowerManager) context.getSystemService(Context.POWER_SERVICE);
                 boolean saver = pm != null && pm.isPowerSaveMode();
                 drawable.setState(level, charging, saver);
+                ImageView iv = iconRef != null ? iconRef.get() : null;
+                if (iv != null) fitIcon(iv, drawable); // width changes with bolt / leaf
             } catch (Throwable t) {
                 XposedBridge.log(TAG + "onReceive failed: " + t);
             }

@@ -12,13 +12,20 @@ import android.graphics.RectF;
 import android.graphics.Shader;
 import android.graphics.Typeface;
 import android.graphics.drawable.Drawable;
+import android.os.Build;
 import android.os.SystemClock;
 
 /**
- * One UI 7 style battery pill with animations:
- *  - plug-in: green fill wipes in from the left, bolt pops in with an overshoot
- *  - while charging: a soft light sweep glides over the fill every few seconds
- *  - level changes glide smoothly, colour changes (charging / saver / low) cross-fade
+ * One UI 7 battery pill (v0.5).
+ *
+ * Look, matched to the One UI 7 status bar:
+ *  - rounded pill, fill grows from the left with a straight (square) edge, lighter track behind it
+ *  - the number is ONE color (the inverse of the icon color) drawn across the whole pill, bold, centered
+ *  - charging: green fill, white bolt in front of the number, pill gets wider to fit the bolt
+ *  - power saving: leaf in front of the number (normal colors), pill gets wider
+ *  - low battery: red fill
+ * Optional (settings): split-color number (old look), yellow power-saving fill, neutral charging fill.
+ *
  * Animations only redraw while they are actually running (no constant redraw = no battery cost).
  */
 public class PillDrawable extends Drawable {
@@ -26,18 +33,20 @@ public class PillDrawable extends Drawable {
     public interface ColorSource { int foreground(); }
 
     // ---- tweakables ----
-    public static final float WIDTH_DP = 26f;
     public static final float HEIGHT_DP = 14f;
-    private static final int COLOR_POWER_SAVE = 0xFFFFC83D;
-    private static final int COLOR_LOW = 0xFFFF4D4D;
+    public static final float WIDTH_DP = 26f;        // number only
+    public static final float WIDTH_ICON_DP = 32f;   // bolt / leaf + number
+    private static final int COLOR_POWER_SAVE = 0xFFFFC83D; // only used by the "yellow" saver style
+    private static final int COLOR_LOW = 0xFFFF4B4B;
+    private static final int INK_DARK = 0xFF1C1C1E;     // number color on a light icon
 
     // animation timing (ms)
-    private static final long INTRO_MS = 1300;          // whole plug-in animation
-    private static final long WIPE_MS = 900;            // fill wipe part of the intro
+    private static final long INTRO_MS = 1300;
+    private static final long WIPE_MS = 900;
     private static final long BOLT_DELAY_MS = 150;
     private static final long BOLT_POP_MS = 450;
-    private static final long SHIMMER_PERIOD_MS = 4200; // charging light sweep cycle
-    private static final long SWEEP_MS = 1100;          // length of one sweep
+    private static final long SHIMMER_PERIOD_MS = 4200;
+    private static final long SWEEP_MS = 1100;
     private static final long LEVEL_ANIM_MS = 600;
     private static final long COLOR_ANIM_MS = 350;
 
@@ -46,10 +55,11 @@ public class PillDrawable extends Drawable {
     private final Paint trackPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
     private final Paint fillPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
     private final Paint textPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
-    private final Paint boltPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
+    private final Paint iconPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
     private final Paint shimmerPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
     private final Path roundPath = new Path();
     private final Path boltPath = new Path();
+    private final Path leafPath = new Path();
     private final RectF rect = new RectF();
     private final Matrix shaderMatrix = new Matrix();
     private final Shader shimmerShader = new LinearGradient(0f, 0f, 1f, 0f,
@@ -73,6 +83,9 @@ public class PillDrawable extends Drawable {
     private boolean animate = true;
     private boolean showBolt = true;
     private boolean showNumber = true;
+    private boolean splitText = false;     // false = One UI 7 single color
+    private boolean yellowSaver = false;   // false = One UI 7 leaf
+    private boolean neutralCharge = false; // false = green fill
 
     // animation state
     private float levelFrom = 100f, levelTo = 100f;
@@ -83,26 +96,43 @@ public class PillDrawable extends Drawable {
     private int colorFrom = Color.WHITE;
     private long colorStart = 0;
     private int lastColor = Color.WHITE;
-    private float boltCx, boltCy;
+    private float iconCx, iconCy;
 
     public PillDrawable(float density, ColorSource colorSource) {
         this.density = density;
         this.colorSource = colorSource;
-        textPaint.setTypeface(Typeface.create("sans-serif-medium", Typeface.BOLD));
+        if (Build.VERSION.SDK_INT >= 28) {
+            textPaint.setTypeface(Typeface.create(Typeface.DEFAULT, 700, false));
+        } else {
+            textPaint.setTypeface(Typeface.create("sans-serif-medium", Typeface.BOLD));
+        }
         textPaint.setTextAlign(Paint.Align.LEFT);
+        buildLeaf();
     }
 
-    public int widthPx() { return Math.round(WIDTH_DP * density * scale); }
+    /** True when a bolt or leaf is shown in front of the number (pill is wider then). */
+    private boolean hasIcon() {
+        return (charging && showBolt) || (powerSave && !charging && !yellowSaver);
+    }
+
+    public int widthPx() {
+        float dp = hasIcon() ? WIDTH_ICON_DP : WIDTH_DP;
+        return Math.round(dp * density * scale);
+    }
     public int heightPx() { return Math.round(HEIGHT_DP * density * scale); }
 
     public void configure(float scale, int lowLevel, int chargeColor,
-                          boolean animate, boolean showBolt, boolean showNumber) {
+                          boolean animate, boolean showBolt, boolean showNumber,
+                          int textStyle, int saverStyle, int chargeStyle) {
         this.scale = scale;
         this.lowLevel = lowLevel;
         this.chargeColor = chargeColor;
         this.animate = animate;
         this.showBolt = showBolt;
         this.showNumber = showNumber;
+        this.splitText = textStyle == 1;
+        this.yellowSaver = saverStyle == 1;
+        this.neutralCharge = chargeStyle == 1;
         invalidateSelf();
     }
 
@@ -113,7 +143,7 @@ public class PillDrawable extends Drawable {
             initialized = true;
             level = l; levelFrom = l; levelTo = l; levelStart = now - LEVEL_ANIM_MS;
             charging = newCharging; powerSave = newPowerSave;
-            chargeAnchor = now - INTRO_MS;     // already charging at start: no intro, shimmer only
+            chargeAnchor = now - INTRO_MS;
             playIntro = false;
             invalidateSelf();
             return;
@@ -124,7 +154,7 @@ public class PillDrawable extends Drawable {
             levelStart = now;
             level = l;
         }
-        if (newCharging && !charging) {        // just plugged in
+        if (newCharging && !charging) {
             chargeAnchor = now;
             playIntro = true;
         }
@@ -182,9 +212,11 @@ public class PillDrawable extends Drawable {
         int fg = colorSource != null ? colorSource.foreground() : Color.WHITE;
         if (Color.alpha(fg) == 0) fg = Color.WHITE;
         fg |= 0xFF000000;
+        final boolean fgLight = isLight(fg);
 
-        // --- colour (cross-fades when the state kind changes) ---
-        int kind = charging ? 1 : powerSave ? 2 : level <= lowLevel ? 3 : 0;
+        // --- fill color (cross-fades when the state kind changes) ---
+        // 1 = charging (green), 2 = yellow power saving (optional), 3 = low (red), 0 = normal
+        int kind = charging ? 1 : (powerSave && yellowSaver) ? 2 : level <= lowLevel ? 3 : 0;
         if (colorKind == -1) {
             colorKind = kind;
             colorStart = now - COLOR_ANIM_MS;
@@ -193,7 +225,7 @@ public class PillDrawable extends Drawable {
             colorKind = kind;
             colorStart = now;
         }
-        int target = kind == 1 ? chargeColor
+        int target = kind == 1 ? (neutralCharge ? fg : chargeColor)
                 : kind == 2 ? COLOR_POWER_SAVE
                 : kind == 3 ? COLOR_LOW
                 : fg;
@@ -206,7 +238,12 @@ public class PillDrawable extends Drawable {
             active = true;
         }
         lastColor = fillColor;
-        int onFill = isLight(fillColor) ? Color.BLACK : Color.WHITE;
+
+        // number / icon colors
+        final int ink = fgLight ? INK_DARK : Color.WHITE;           // inverse of the icon color
+        final int single = (charging && !neutralCharge) ? Color.WHITE : ink; // One UI 7: one color
+        final int onFill = isLight(fillColor) ? INK_DARK : Color.WHITE;      // split style, inside fill
+        final int onTrack = fg;                                              // split style, on track
 
         // --- level (glides) ---
         float disp = animate ? displayLevel(now) : levelTo;
@@ -220,9 +257,9 @@ public class PillDrawable extends Drawable {
             if (dt < INTRO_MS) { introMs = dt; active = true; }
         }
         if (introMs >= 0f) frac *= easeOutCubic(introMs / (float) WIPE_MS);
-        float boltScale = 1f;
-        if (introMs >= 0f) boltScale = easeOutBack((introMs - BOLT_DELAY_MS) / (float) BOLT_POP_MS);
-        if (introMs >= 0f && introMs < BOLT_DELAY_MS) boltScale = 0f;
+        float iconScale = 1f;
+        if (introMs >= 0f) iconScale = easeOutBack((introMs - BOLT_DELAY_MS) / (float) BOLT_POP_MS);
+        if (introMs >= 0f && introMs < BOLT_DELAY_MS) iconScale = 0f;
 
         // --- shimmer while charging ---
         boolean sweeping = false;
@@ -250,15 +287,15 @@ public class PillDrawable extends Drawable {
         roundPath.reset();
         roundPath.addRoundRect(rect, r, r, Path.Direction.CW);
 
-        // track
+        // track (lighter on a dark status bar, softer on a light one)
         trackPaint.setStyle(Paint.Style.FILL);
         trackPaint.setColor(fg);
-        trackPaint.setAlpha((int) (90 * alpha / 255f));
+        trackPaint.setAlpha((int) ((fgLight ? 150 : 95) * alpha / 255f));
         canvas.drawPath(roundPath, trackPaint);
 
         float fillRight = b.left + w * Math.max(0f, Math.min(1f, frac));
 
-        // fill, clipped to the pill shape
+        // fill, clipped to the pill shape, straight right edge
         canvas.save();
         canvas.clipPath(roundPath);
         fillPaint.setStyle(Paint.Style.FILL);
@@ -283,33 +320,51 @@ public class PillDrawable extends Drawable {
             canvas.restore();
         }
 
-        // --- number (+ bolt) ---
-        textPaint.setTextSize(h * 0.68f);
+        // --- number + icon layout (centered as one group) ---
+        boolean drawBolt = charging && showBolt;
+        boolean drawLeaf = powerSave && !charging && !yellowSaver;
+        boolean icon = drawBolt || drawLeaf;
+        float iconW = icon ? h * (drawLeaf ? 0.52f : 0.40f) : 0f;
+        float iconH = icon ? h * (drawLeaf ? 0.52f : 0.66f) : 0f;
+        float gap = (icon && showNumber) ? h * 0.10f : 0f;
+        float pad = h * 0.14f;
+
+        float textSize = h * 0.74f;
+        textPaint.setTextSize(textSize);
         String s = String.valueOf(level);
         float textW = showNumber ? textPaint.measureText(s) : 0f;
-        boolean drawBolt = charging && showBolt;
-        float boltW = drawBolt ? h * 0.32f : 0f;
-        float gap = (drawBolt && showNumber) ? h * 0.06f : 0f;
-        float total = boltW + gap + textW;
+        float avail = w - 2f * pad - iconW - gap;
+        if (showNumber && textW > avail && avail > 0f) {      // "100" etc: shrink to fit
+            textSize *= avail / textW;
+            textPaint.setTextSize(textSize);
+            textW = textPaint.measureText(s);
+        }
+        float total = iconW + gap + textW;
         float startX = b.left + (w - total) / 2f;
         Paint.FontMetrics fm = textPaint.getFontMetrics();
         float baseline = b.top + h / 2f - (fm.ascent + fm.descent) / 2f;
+        float textX = startX + iconW + gap;
 
-        if (drawBolt) {
-            buildBolt(startX, b.top + h * 0.20f, boltW, h * 0.60f);
-            boltCx = startX + boltW / 2f;
-            boltCy = b.top + h / 2f;
+        if (icon) {
+            float iy = b.top + (h - iconH) / 2f;
+            if (drawBolt) buildBolt(startX, iy, iconW, iconH);
+            else placeLeaf(startX, iy, iconW, iconH);
+            iconCx = startX + iconW / 2f;
+            iconCy = b.top + h / 2f;
         }
 
-        canvas.save();
-        canvas.clipRect(b.left, b.top, fillRight, b.bottom);
-        drawContent(canvas, s, startX + boltW + gap, baseline, onFill, boltScale);
-        canvas.restore();
-
-        canvas.save();
-        canvas.clipRect(fillRight, b.top, b.right, b.bottom);
-        drawContent(canvas, s, startX + boltW + gap, baseline, fg, boltScale);
-        canvas.restore();
+        if (!splitText) {
+            drawContent(canvas, s, textX, baseline, single, drawBolt, drawLeaf, iconScale);
+        } else {
+            canvas.save();
+            canvas.clipRect(b.left, b.top, fillRight, b.bottom);
+            drawContent(canvas, s, textX, baseline, onFill, drawBolt, drawLeaf, iconScale);
+            canvas.restore();
+            canvas.save();
+            canvas.clipRect(fillRight, b.top, b.right, b.bottom);
+            drawContent(canvas, s, textX, baseline, onTrack, drawBolt, drawLeaf, iconScale);
+            canvas.restore();
+        }
 
         // --- schedule next frame only while something is animating ---
         unscheduleSelf(tick);
@@ -320,32 +375,50 @@ public class PillDrawable extends Drawable {
         }
     }
 
-    private void drawContent(Canvas canvas, String s, float x, float baseline, int color, float boltScale) {
+    private void drawContent(Canvas canvas, String s, float x, float baseline, int color,
+                             boolean bolt, boolean leaf, float iconScale) {
         if (showNumber) {
             textPaint.setColor(color);
             textPaint.setAlpha(alpha);
             canvas.drawText(s, x, baseline, textPaint);
         }
-        if (charging && showBolt && boltScale > 0.01f) {
-            boltPaint.setStyle(Paint.Style.FILL);
-            boltPaint.setColor(color);
-            boltPaint.setAlpha(alpha);
+        if ((bolt || leaf) && iconScale > 0.01f) {
+            iconPaint.setStyle(Paint.Style.FILL);
+            iconPaint.setColor(color);
+            iconPaint.setAlpha(alpha);
             canvas.save();
-            canvas.scale(boltScale, boltScale, boltCx, boltCy);
-            canvas.drawPath(boltPath, boltPaint);
+            canvas.scale(iconScale, iconScale, iconCx, iconCy);
+            canvas.drawPath(bolt ? boltPath : leafPath, iconPaint);
             canvas.restore();
         }
     }
 
     private void buildBolt(float x, float y, float w, float h) {
         boltPath.reset();
-        boltPath.moveTo(x + w * 0.60f, y);
+        boltPath.moveTo(x + w * 0.62f, y);
         boltPath.lineTo(x, y + h * 0.56f);
         boltPath.lineTo(x + w * 0.46f, y + h * 0.56f);
         boltPath.lineTo(x + w * 0.38f, y + h);
         boltPath.lineTo(x + w, y + h * 0.40f);
         boltPath.lineTo(x + w * 0.54f, y + h * 0.40f);
         boltPath.close();
+    }
+
+    // unit-square leaf, scaled/translated into place by placeLeaf()
+    private final Path leafUnit = new Path();
+    private void buildLeaf() {
+        leafUnit.reset();
+        leafUnit.moveTo(0.10f, 0.92f);                                    // stem tip
+        leafUnit.cubicTo(0.00f, 0.50f, 0.30f, 0.10f, 0.95f, 0.05f);       // upper edge to tip
+        leafUnit.cubicTo(1.00f, 0.62f, 0.62f, 0.96f, 0.16f, 0.86f);       // lower edge back
+        leafUnit.close();
+    }
+    private void placeLeaf(float x, float y, float w, float h) {
+        Matrix m = new Matrix();
+        m.setScale(w, h);
+        m.postTranslate(x, y);
+        leafPath.reset();
+        leafUnit.transform(m, leafPath);
     }
 
     @Override public void setAlpha(int a) { alpha = a; invalidateSelf(); }

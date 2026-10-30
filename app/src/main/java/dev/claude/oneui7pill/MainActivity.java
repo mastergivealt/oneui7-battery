@@ -1,10 +1,7 @@
 package dev.claude.oneui7pill;
 
 import android.app.Activity;
-import android.content.Intent;
-import android.net.Uri;
 import android.os.Bundle;
-import android.provider.Settings;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.Button;
@@ -16,23 +13,15 @@ import android.widget.Switch;
 import android.widget.TextView;
 import android.widget.Toast;
 
-/** Plain settings screen: writes Settings.System keys that SystemUI reads live. */
+/** Plain settings screen: writes into ConfigProvider, SystemUI reads it live. */
 public class MainActivity extends Activity {
 
     private TextView status;
-    private TextView permBanner;
-    private Button permButton;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         build();
-    }
-
-    @Override
-    protected void onResume() {
-        super.onResume();
-        refreshPermission();
     }
 
     private int dp(int v) {
@@ -68,12 +57,6 @@ public class MainActivity extends Activity {
         }
     }
 
-    private void refreshPermission() {
-        boolean ok = true; // no special permission needed any more
-        permBanner.setVisibility(ok ? View.GONE : View.VISIBLE);
-        permButton.setVisibility(ok ? View.GONE : View.VISIBLE);
-    }
-
     private void build() {
         ScrollView sv = new ScrollView(this);
         LinearLayout col = new LinearLayout(this);
@@ -98,24 +81,22 @@ public class MainActivity extends Activity {
         status.setPadding(0, 0, 0, dp(12));
         col.addView(status, matchWrap());
 
-        permBanner = new TextView(this);
-        permBanner.setText("Needs the \"Modify system settings\" permission to talk to SystemUI.");
-        col.addView(permBanner, matchWrap());
-        permButton = new Button(this);
-        permButton.setText("Grant permission");
-        permButton.setOnClickListener(new View.OnClickListener() {
-            @Override public void onClick(View v) {
-                Intent i = new Intent(Settings.ACTION_MANAGE_WRITE_SETTINGS,
-                        Uri.parse("package:" + getPackageName()));
-                startActivity(i);
-            }
-        });
-        col.addView(permButton, matchWrap());
-
         addSwitch(col, "Enable pill (off = stock icon)", PillConfig.K_ENABLED, 1);
         addSwitch(col, "Animations", PillConfig.K_ANIM, 1);
         addSwitch(col, "Charging bolt", PillConfig.K_BOLT, 1);
         addSwitch(col, "Percentage inside the pill", PillConfig.K_INSIDE, 1);
+
+        TextView look = new TextView(this);
+        look.setText("Look");
+        look.setTextSize(20f);
+        look.setPadding(0, dp(20), 0, dp(0));
+        col.addView(look, matchWrap());
+        addSeek(col, "Number style", PillConfig.K_TEXT_STYLE, 0, 1, 0, "",
+                new String[] { "One UI 7 (one color)", "Split color (old)" });
+        addSeek(col, "Power saving", PillConfig.K_SAVER_STYLE, 0, 1, 0, "",
+                new String[] { "Leaf (One UI 7)", "Yellow fill (old)" });
+        addSeek(col, "Charging fill", PillConfig.K_CHARGE_STYLE, 0, 1, 0, "",
+                new String[] { "Colored (see below)", "Neutral + bolt" });
 
         addSeek(col, "Size", PillConfig.K_SCALE, 70, 140, 100, "%", null);
         addSeek(col, "Low battery color below", PillConfig.K_LOW, 5, 30, 15, "%", null);
@@ -158,6 +139,9 @@ public class MainActivity extends Activity {
                 put(PillConfig.K_SCALE, 100);
                 put(PillConfig.K_LOW, 15);
                 put(PillConfig.K_COLOR, 0);
+                put(PillConfig.K_TEXT_STYLE, 0);
+                put(PillConfig.K_SAVER_STYLE, 0);
+                put(PillConfig.K_CHARGE_STYLE, 0);
                 recreate();
             }
         });
