@@ -91,8 +91,8 @@ public class MainActivity extends Activity {
         look.setTextSize(20f);
         look.setPadding(0, dp(20), 0, dp(0));
         col.addView(look, matchWrap());
-        addSeek(col, "Number style", PillConfig.K_TEXT_STYLE, 0, 1, 0, "",
-                new String[] { "One UI 7 (one color)", "Split color (old)" });
+        addSeek(col, "Number style", PillConfig.K_TEXT_STYLE, 0, 2, 2, "",
+                new String[] { "One color", "Split color (old)", "Cutout (One UI 7 stable)" });
         addSeek(col, "Power saving", PillConfig.K_SAVER_STYLE, 0, 1, 0, "",
                 new String[] { "Leaf (One UI 7)", "Yellow fill (old)" });
         addSeek(col, "Charging fill", PillConfig.K_CHARGE_STYLE, 0, 1, 0, "",
@@ -102,6 +102,35 @@ public class MainActivity extends Activity {
         addSeek(col, "Low battery color below", PillConfig.K_LOW, 5, 30, 15, "%", null);
         addSeek(col, "Charging color", PillConfig.K_COLOR, 0, PillConfig.COLORS.length - 1, 0, "",
                 PillConfig.COLOR_NAMES);
+
+        Button preset = new Button(this);
+        preset.setText("Apply One UI 7 look (preset)");
+        preset.setOnClickListener(new View.OnClickListener() {
+            @Override public void onClick(View v) {
+                put(PillConfig.K_ENABLED, 1);
+                put(PillConfig.K_INSIDE, 1);
+                put(PillConfig.K_TEXT_STYLE, 2);
+                put(PillConfig.K_SAVER_STYLE, 0);
+                put(PillConfig.K_CHARGE_STYLE, 1);
+                put(PillConfig.K_SCALE, 100);
+                put(PillConfig.K_LOW, 15);
+                put(PillConfig.K_SB_EXTRA, 10);
+                recreate();
+            }
+        });
+        col.addView(preset, matchWrap());
+
+        TextView sbTitle = new TextView(this);
+        sbTitle.setText("Status bar");
+        sbTitle.setTextSize(20f);
+        sbTitle.setPadding(0, dp(28), 0, dp(4));
+        col.addView(sbTitle, matchWrap());
+        TextView sbInfo = new TextView(this);
+        sbInfo.setText("One UI 7 has wider left/right margins than One UI 6.1 (about +10 dp). "
+                + "This works directly on the status bar view and applies live. 0 = stock.");
+        sbInfo.setPadding(0, 0, 0, dp(4));
+        col.addView(sbInfo, matchWrap());
+        addSeek(col, "Extra side margin", PillConfig.K_SB_EXTRA, 0, 28, 0, " dp", null);
 
         TextView uiTitle = new TextView(this);
         uiTitle.setText("Notifications & Quick Settings");
@@ -129,8 +158,9 @@ public class MainActivity extends Activity {
         }
 
         TextView sbNote = new TextView(this);
-        sbNote.setText("Status bar: the three sliders above (side margins / icon spacing / clock size) only "
-                + "work if SystemUI reads those dimens under the names this version knows. If nothing "
+        sbNote.setText("Status bar sliders below (percent of stock) only work if SystemUI reads those dimens "
+                + "under the names this version knows; the \"Extra side margin\" slider above does not "
+                + "depend on names. If nothing "
                 + "changes, switch on the discovery log, restart SystemUI, open Vector manager -> Logs and "
                 + "send me the '[OneUI7Pill] dimen ...' lines.");
         sbNote.setPadding(0, dp(12), 0, dp(4));
@@ -151,7 +181,8 @@ public class MainActivity extends Activity {
                 put(PillConfig.K_SCALE, 100);
                 put(PillConfig.K_LOW, 15);
                 put(PillConfig.K_COLOR, 0);
-                put(PillConfig.K_TEXT_STYLE, 0);
+                put(PillConfig.K_TEXT_STYLE, 2);
+                put(PillConfig.K_SB_EXTRA, 0);
                 put(PillConfig.K_SAVER_STYLE, 0);
                 put(PillConfig.K_CHARGE_STYLE, 0);
                 recreate();

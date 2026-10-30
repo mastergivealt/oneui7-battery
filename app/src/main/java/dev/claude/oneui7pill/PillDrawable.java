@@ -8,6 +8,8 @@ import android.graphics.Matrix;
 import android.graphics.Paint;
 import android.graphics.Path;
 import android.graphics.PixelFormat;
+import android.graphics.PorterDuff;
+import android.graphics.PorterDuffXfermode;
 import android.graphics.RectF;
 import android.graphics.Shader;
 import android.graphics.Typeface;
@@ -24,7 +26,10 @@ import android.os.SystemClock;
  *  - charging: green fill, white bolt in front of the number, pill gets wider to fit the bolt
  *  - power saving: leaf in front of the number (normal colors), pill gets wider
  *  - low battery: red fill
- * Optional (settings): split-color number (old look), yellow power-saving fill, neutral charging fill.
+ * v0.7: "Cutout" number style (default): number and bolt/leaf are punched THROUGH the pill, so the
+ * wallpaper / status bar shows through them - this is what One UI 7 stable does.
+ * Optional (settings): one inverted color, split-color number (old look), yellow power-saving fill,
+ * neutral charging fill.
  *
  * Animations only redraw while they are actually running (no constant redraw = no battery cost).
  */
@@ -57,6 +62,7 @@ public class PillDrawable extends Drawable {
     private final Paint textPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
     private final Paint iconPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
     private final Paint shimmerPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
+    private final PorterDuffXfermode clearMode = new PorterDuffXfermode(PorterDuff.Mode.CLEAR);
     private final Path roundPath = new Path();
     private final Path boltPath = new Path();
     private final Path leafPath = new Path();
@@ -83,7 +89,8 @@ public class PillDrawable extends Drawable {
     private boolean animate = true;
     private boolean showBolt = true;
     private boolean showNumber = true;
-    private boolean splitText = false;     // false = One UI 7 single color
+    private boolean splitText = false;     // false = one color
+    private boolean cutoutText = true;     // number + icon punched through the pill (One UI 7 stable)
     private boolean yellowSaver = false;   // false = One UI 7 leaf
     private boolean neutralCharge = false; // false = green fill
 
@@ -131,6 +138,7 @@ public class PillDrawable extends Drawable {
         this.showBolt = showBolt;
         this.showNumber = showNumber;
         this.splitText = textStyle == 1;
+        this.cutoutText = textStyle == 2;
         this.yellowSaver = saverStyle == 1;
         this.neutralCharge = chargeStyle == 1;
         invalidateSelf();
@@ -287,6 +295,12 @@ public class PillDrawable extends Drawable {
         roundPath.reset();
         roundPath.addRoundRect(rect, r, r, Path.Direction.CW);
 
+        // cutout style: draw everything into a layer so the number can be punched through it
+        int layer = -1;
+        if (cutoutText) {
+            layer = canvas.saveLayer(b.left - 1f, b.top - 1f, b.right + 1f, b.bottom + 1f, null);
+        }
+
         // track (lighter on a dark status bar, softer on a light one)
         trackPaint.setStyle(Paint.Style.FILL);
         trackPaint.setColor(fg);
@@ -353,7 +367,14 @@ public class PillDrawable extends Drawable {
             iconCy = b.top + h / 2f;
         }
 
-        if (!splitText) {
+        if (cutoutText) {
+            textPaint.setXfermode(clearMode);
+            iconPaint.setXfermode(clearMode);
+            drawContent(canvas, s, textX, baseline, Color.BLACK, drawBolt, drawLeaf, iconScale);
+            textPaint.setXfermode(null);
+            iconPaint.setXfermode(null);
+            canvas.restoreToCount(layer);
+        } else if (!splitText) {
             drawContent(canvas, s, textX, baseline, single, drawBolt, drawLeaf, iconScale);
         } else {
             canvas.save();

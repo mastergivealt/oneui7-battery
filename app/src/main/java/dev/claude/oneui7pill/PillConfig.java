@@ -23,7 +23,7 @@ public final class PillConfig {
     public static final String K_LOW = P + "low";
     public static final String K_COLOR = P + "color";
     // v0.5
-    public static final String K_TEXT_STYLE = P + "text_style";   // 0 = One UI 7 (single inverted color), 1 = split
+    public static final String K_TEXT_STYLE = P + "text_style";   // 0 = one inverted color, 1 = split, 2 = cutout (One UI 7 stable)
     public static final String K_SAVER_STYLE = P + "saver_style"; // 0 = One UI 7 (leaf), 1 = yellow fill
     public static final String K_CHARGE_STYLE = P + "charge_style"; // 0 = green fill, 1 = neutral fill + bolt
 
@@ -41,6 +41,8 @@ public final class PillConfig {
     public static final String K_SB_GAP = P + "sb_gap";     // space between status icons
     public static final String K_SB_CLOCK = P + "sb_clock"; // clock text size
     public static final String K_SB_LOG = P + "sb_log";     // discovery log of status bar dimens
+    // v0.7: view-level extra left/right margin of the status bar (dp, 0 = stock)
+    public static final String K_SB_EXTRA = P + "sb_extra";
 
     /** Order matches the group ids in UiHook. */
     public static final String[] UI_KEYS = {
@@ -63,6 +65,7 @@ public final class PillConfig {
     public static volatile int textStyle = 0;
     public static volatile int saverStyle = 0;
     public static volatile int chargeStyle = 0;
+    public static volatile int sbExtraDp = 0;
 
     public static volatile boolean uiOn = false;
     public static volatile boolean sbLog = false;
@@ -114,9 +117,10 @@ public final class PillConfig {
         scalePct = Math.max(70, Math.min(140, get(m, K_SCALE, 100)));
         low = Math.max(5, Math.min(30, get(m, K_LOW, 15)));
         colorIdx = Math.max(0, Math.min(COLORS.length - 1, get(m, K_COLOR, 0)));
-        textStyle = Math.max(0, Math.min(1, get(m, K_TEXT_STYLE, 0)));
+        textStyle = Math.max(0, Math.min(2, get(m, K_TEXT_STYLE, 2)));
         saverStyle = Math.max(0, Math.min(1, get(m, K_SAVER_STYLE, 0)));
         chargeStyle = Math.max(0, Math.min(1, get(m, K_CHARGE_STYLE, 0)));
+        sbExtraDp = Math.max(0, Math.min(28, get(m, K_SB_EXTRA, 0)));
 
         uiOn = get(m, K_UI_ON, 0) != 0;
         sbLog = get(m, K_SB_LOG, 0) != 0;

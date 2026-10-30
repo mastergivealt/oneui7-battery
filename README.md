@@ -74,3 +74,16 @@ margins, icon spacing, clock size. One UI 7 has clearly larger left/right margin
 They rescale SystemUI dimens by NAME; the names are AOSP guesses (not verified on A136B).
 "Status bar discovery log": logs every status-bar-looking dimen SystemUI reads, with its value, to the
 Vector log as `[OneUI7Pill] dimen <name> = <value>`. Use it once, then the real names go into UiHook.
+
+## v0.7.0 - One UI 7 status bar (battery cutout + wider margins)
+- Number style "Cutout (One UI 7 stable)" is the new default: the number and the bolt/leaf are punched
+  THROUGH the pill, so the status bar / wallpaper shows through them (white pill + see-through number),
+  exactly like the One UI 7 reference renders. Old styles stay in Look -> Number style.
+- New "Status bar -> Extra side margin" (0-28 dp, applies live): adds padding on both sides of the
+  status bar contents view. One UI 7 is about +10 dp wider than 6.1. Works on the view itself, so it
+  does not depend on dimen names (the older percent sliders still do).
+- "Apply One UI 7 look (preset)" button: cutout number, leaf for power saving, neutral fill + bolt
+  while charging, +10 dp margin.
+- Vector log lines to check: `status bar contents found: ...` (works) or `status bar contents NOT
+  found ... chain: ...` (send me that line).
+Not included: the new bold wifi/signal icon artwork (those are separate system icon drawables).

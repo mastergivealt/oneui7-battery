@@ -104,6 +104,30 @@ public class PillHook implements IXposedHookLoadPackage {
             XposedBridge.log(TAG + "UiHook install failed: " + t);
         }
 
+        // v0.7: the status bar clock is another place to find the status bar (for side margins)
+        try {
+            Class<?> clock = XposedHelpers.findClassIfExists(
+                    "com.android.systemui.statusbar.policy.Clock", lpparam.classLoader);
+            if (clock != null) {
+                int n = XposedBridge.hookAllMethods(clock, "onAttachedToWindow", new XC_MethodHook() {
+                    @Override
+                    protected void afterHookedMethod(MethodHookParam param) {
+                        try {
+                            if (param.thisObject instanceof View) {
+                                ensureConfig(((View) param.thisObject).getContext());
+                                StatusBarTweaks.onViewAttached((View) param.thisObject);
+                            }
+                        } catch (Throwable t) {
+                            XposedBridge.log(TAG + "clock hook failed: " + t);
+                        }
+                    }
+                }).size();
+                XposedBridge.log(TAG + "hooked " + n + " Clock.onAttachedToWindow");
+            }
+        } catch (Throwable t) {
+            XposedBridge.log(TAG + "Clock hook failed: " + t);
+        }
+
         Class<?> cls = XposedHelpers.findClassIfExists(VIEW_CLASS, lpparam.classLoader);
         if (cls == null) {
             XposedBridge.log(TAG + "BatteryMeterView not found - nothing hooked (stock icon stays).");
@@ -183,6 +207,7 @@ public class PillHook implements IXposedHookLoadPackage {
     }
 
     private static void refreshAll() {
+        StatusBarTweaks.reapplyAll();
         List<View> list;
         synchronized (VIEWS) { list = new ArrayList<View>(VIEWS.keySet()); }
         for (View v : list) {
@@ -205,6 +230,7 @@ public class PillHook implements IXposedHookLoadPackage {
         ensureConfig(root.getContext());
         reloadIfStale();
         VIEWS.put(root, Boolean.TRUE);
+        StatusBarTweaks.onViewAttached(root);
 
         Holder h = (Holder) XposedHelpers.getAdditionalInstanceField(root, HOLDER_KEY);
 
