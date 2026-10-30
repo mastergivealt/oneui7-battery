@@ -119,18 +119,30 @@ public class MainActivity extends Activity {
         addSwitch(col, "Enable notification & QS tweaks", PillConfig.K_UI_ON, 0);
         String[] uiLabels = {
                 "Notification card corners", "Notification group spacing", "Notification side margin",
-                "Quick Settings corners", "Brightness slider corners", "Quick Settings side padding"
+                "Quick Settings corners", "Brightness slider corners", "Quick Settings side padding",
+                "Status bar side margins (One UI 7 = ~250-300%)", "Status bar icon spacing",
+                "Status bar clock size"
         };
         for (int i = 0; i < uiLabels.length; i++) {
             addSeek(col, uiLabels[i], PillConfig.UI_KEYS[i], PillConfig.UI_MIN[i], PillConfig.UI_MAX[i],
                     100, "%", null);
         }
 
+        TextView sbNote = new TextView(this);
+        sbNote.setText("Status bar: the three sliders above (side margins / icon spacing / clock size) only "
+                + "work if SystemUI reads those dimens under the names this version knows. If nothing "
+                + "changes, switch on the discovery log, restart SystemUI, open Vector manager -> Logs and "
+                + "send me the '[OneUI7Pill] dimen ...' lines.");
+        sbNote.setPadding(0, dp(12), 0, dp(4));
+        col.addView(sbNote, matchWrap());
+        addSwitch(col, "Status bar discovery log", PillConfig.K_SB_LOG, 0);
+
         Button reset = new Button(this);
         reset.setText("Reset to defaults");
         reset.setOnClickListener(new View.OnClickListener() {
             @Override public void onClick(View v) {
                 put(PillConfig.K_UI_ON, 0);
+                put(PillConfig.K_SB_LOG, 0);
                 for (String k : PillConfig.UI_KEYS) put(k, 100);
                 put(PillConfig.K_ENABLED, 1);
                 put(PillConfig.K_ANIM, 1);

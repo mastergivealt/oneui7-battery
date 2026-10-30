@@ -67,3 +67,10 @@ Install the new APK over the old one and restart SystemUI. Old oneui7pill_* syst
 - Track is lighter on a dark status bar and softer on a light one.
 - Fixed: stale "Grant permission" banner removed from the app, possible view leak in the holder.
 Update: upload the changed files to the same repo, build, install over the old APK, restart SystemUI.
+
+## v0.6.0 - status bar (experimental)
+Three new sliders in "Notifications & Quick Settings" (master switch must be ON): status bar side
+margins, icon spacing, clock size. One UI 7 has clearly larger left/right margins than One UI 6.1.
+They rescale SystemUI dimens by NAME; the names are AOSP guesses (not verified on A136B).
+"Status bar discovery log": logs every status-bar-looking dimen SystemUI reads, with its value, to the
+Vector log as `[OneUI7Pill] dimen <name> = <value>`. Use it once, then the real names go into UiHook.

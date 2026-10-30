@@ -36,12 +36,19 @@ public final class PillConfig {
     public static final String K_BRIGHT_RADIUS = P + "bright_radius";
     public static final String K_QS_SIDE = P + "qs_side";
 
+    // v0.6: status bar
+    public static final String K_SB_SIDE = P + "sb_side";   // status bar left/right padding
+    public static final String K_SB_GAP = P + "sb_gap";     // space between status icons
+    public static final String K_SB_CLOCK = P + "sb_clock"; // clock text size
+    public static final String K_SB_LOG = P + "sb_log";     // discovery log of status bar dimens
+
     /** Order matches the group ids in UiHook. */
     public static final String[] UI_KEYS = {
-            K_NOTIF_RADIUS, K_NOTIF_GAP, K_NOTIF_SIDE, K_QS_RADIUS, K_BRIGHT_RADIUS, K_QS_SIDE
+            K_NOTIF_RADIUS, K_NOTIF_GAP, K_NOTIF_SIDE, K_QS_RADIUS, K_BRIGHT_RADIUS, K_QS_SIDE,
+            K_SB_SIDE, K_SB_GAP, K_SB_CLOCK
     };
-    public static final int[] UI_MIN = { 0, 0, 50, 0, 0, 50 };
-    public static final int[] UI_MAX = { 250, 200, 200, 250, 250, 200 };
+    public static final int[] UI_MIN = { 0, 0, 50, 0, 0, 50, 50, 0, 80 };
+    public static final int[] UI_MAX = { 250, 200, 200, 250, 250, 200, 500, 300, 140 };
 
     public static final int[] COLORS = { 0xFF3DDC84, 0xFF4DA3FF, 0xFF2DD4BF, 0xFFB388FF, 0xFFFF6FAE };
     public static final String[] COLOR_NAMES = { "Green", "Blue", "Teal", "Purple", "Pink" };
@@ -58,8 +65,9 @@ public final class PillConfig {
     public static volatile int chargeStyle = 0;
 
     public static volatile boolean uiOn = false;
+    public static volatile boolean sbLog = false;
     /** Percent of the stock value per UiHook group (100 = stock). */
-    public static final int[] UI_PCT = { 100, 100, 100, 100, 100, 100 };
+    public static final int[] UI_PCT = { 100, 100, 100, 100, 100, 100, 100, 100, 100 };
 
     public static int chargeColor() {
         int i = colorIdx;
@@ -111,6 +119,7 @@ public final class PillConfig {
         chargeStyle = Math.max(0, Math.min(1, get(m, K_CHARGE_STYLE, 0)));
 
         uiOn = get(m, K_UI_ON, 0) != 0;
+        sbLog = get(m, K_SB_LOG, 0) != 0;
         for (int i = 0; i < UI_KEYS.length; i++) {
             UI_PCT[i] = Math.max(UI_MIN[i], Math.min(UI_MAX[i], get(m, UI_KEYS[i], 100)));
         }
